@@ -1,0 +1,32 @@
+### Submit a single order
+POST https://localhost:7001/api/order/submit
+Content-Type: application/json
+
+{
+  "productName": "Laptop",
+  "quantity": 2
+}
+
+###
+
+### Submit another order
+POST https://localhost:7001/api/order/submit
+Content-Type: application/json
+
+{
+  "productName": "Wireless Mouse",
+  "quantity": 5
+}
+
+###
+
+### Submit batch orders (5 orders)
+POST https://localhost:7001/api/order/submit-batch?count=5
+
+###
+
+### Submit batch orders (10 orders)
+POST https://localhost:7001/api/order/submit-batch?count=10
+
+###
+
