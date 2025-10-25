@@ -31,7 +31,7 @@ builder.Services.AddMassTransit(x =>
             e.Bind(exchangeName, s =>
             {
                 s.ExchangeType = "topic";
-                s.RoutingKey = "#"; // Subscribe to all messages on this exchange
+                s.RoutingKey = "order-submitted-queue"; //"#"; // Subscribe to all messages on this exchange
             });
 
             e.ConfigureConsumer<OrderSubmittedConsumer>(context);
