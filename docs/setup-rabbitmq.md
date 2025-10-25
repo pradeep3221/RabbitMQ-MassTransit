@@ -91,16 +91,44 @@ Default credentials:
 
 ## 2. Docker Setup
 
+### Create Network
+First, create a dedicated network for RabbitMQ and related services:
+
+```bash
+# Create a user-defined network
+docker network create rabbitmq-net
+```
+
+### Run RabbitMQ Container
 Run RabbitMQ with management plugin using Docker:
 
 ```bash
 docker run -d --name rabbitmq \
-    -p 5672:5672 \        # AMQP port
-    -p 15672:15672 \      # Management UI port
+    --network rabbitmq-net \  # Attach to the custom network
+    -p 5672:5672 \           # AMQP port
+    -p 15672:15672 \         # Management UI port
+    -p 5671:5671 \           # AMQP with TLS port
+    -p 15692:15692 \         # Prometheus metrics port
     -v rabbitmq_data:/var/lib/rabbitmq \  # Persist data
     -e RABBITMQ_DEFAULT_USER=admin \      # Custom username
     -e RABBITMQ_DEFAULT_PASS=secret123 \  # Custom password
+    -e RABBITMQ_ERLANG_COOKIE=unique-cookie-value \  # For clustering
+    --hostname rabbitmq-1 \   # Set hostname for clustering
+    --health-cmd "rabbitmq-diagnostics check_running" \  # Health check
+    --health-interval=30s \
+    --health-timeout=10s \
+    --health-retries=5 \
     rabbitmq:3.13-management
+```
+
+### Network Usage
+Other containers can now connect to RabbitMQ using the container name as hostname:
+```bash
+# Example: Running a service that needs to connect to RabbitMQ
+docker run -d --name my-service \
+    --network rabbitmq-net \
+    -e RABBITMQ_HOST=rabbitmq \  # Use container name as hostname
+    my-service-image
 ```
 
 ## 3. Docker Compose Setup
