@@ -331,6 +331,9 @@ Deploy RabbitMQ using the Bitnami Helm chart:
   kubectl create namespace rabbitmq
   kubectl apply -f rabbitmq-cluster.yaml
   ```
+kubectl get pods -n rabbitmq
+
+
 
   ### 3. Access Management UI
   ```bash
