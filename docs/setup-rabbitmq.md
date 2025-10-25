@@ -218,15 +218,60 @@ Deploy RabbitMQ using the Bitnami Helm chart:
    kubectl create namespace rabbitmq
 
    # Install RabbitMQ
+   # Make sure you're in the directory containing values.yaml
    helm install rabbitmq bitnami/rabbitmq \
      --namespace rabbitmq \
      --values values.yaml
    ```
 
-4. Access Management UI:
+4. Verify Installation and Access Services:
+
+   a. Check Deployment Status:
+   ```bash
+   # Check if pods are running
+   kubectl get pods -n rabbitmq
+   
+   # Check services
+   kubectl get svc -n rabbitmq
+   ```
+
+   b. Get Access Credentials:
+   ```bash
+   # Get admin password
+   kubectl get secret --namespace rabbitmq rabbitmq -o jsonpath="{.data.rabbitmq-password}" | base64 -d
+   
+   # Get Erlang cookie (for clustering)
+   kubectl get secret --namespace rabbitmq rabbitmq -o jsonpath="{.data.rabbitmq-erlang-cookie}" | base64 -d
+   ```
+
+   c. Access Management UI:
    ```bash
    # Port forward the management UI
    kubectl port-forward --namespace rabbitmq svc/rabbitmq 15672:15672
+   ```
+   Then open http://127.0.0.1:15672/ in your browser
+   
+   d. Access AMQP Port:
+   ```bash
+   # Port forward the AMQP port
+   kubectl port-forward --namespace rabbitmq svc/rabbitmq 5672:5672
+   ```
+   Use amqp://127.0.0.1:5672 as your connection URL
+
+   e. Access Prometheus Metrics:
+   ```bash
+   # Port forward the metrics port
+   kubectl port-forward --namespace rabbitmq svc/rabbitmq 9419:9419
+   ```
+   Access metrics at http://127.0.0.1:9419/metrics
+
+   f. View Logs:
+   ```bash
+   # Get pod name first
+   export POD_NAME=$(kubectl get pods --namespace rabbitmq -l app.kubernetes.io/name=rabbitmq -o jsonpath="{.items[0].metadata.name}")
+   
+   # View logs
+   kubectl logs -f $POD_NAME -n rabbitmq
    ```
 
   ## 4a. Kubernetes: RabbitMQ Cluster Operator
@@ -414,6 +459,52 @@ terraform destroy
    - Keep RabbitMQ and Erlang versions up to date
    - Schedule regular maintenance windows
    - Monitor system resources and scale as needed
+
+5. **Troubleshooting**:
+
+   a. Helm Installation Issues:
+      - Error with values.yaml not found: Ensure you're in the correct directory or provide full path
+      - ServiceMonitor errors: Disable ServiceMonitor if Prometheus Operator is not installed
+      - Plugin format errors: Use comma-separated string instead of YAML array for plugins
+
+   b. Pod Startup Issues:
+      ```bash
+      # Check pod status
+      kubectl get pods -n rabbitmq
+      
+      # Check pod events
+      kubectl describe pod <pod-name> -n rabbitmq
+      
+      # Check logs
+      kubectl logs <pod-name> -n rabbitmq
+      ```
+
+   c. Persistence Issues:
+      - Check PVC status: `kubectl get pvc -n rabbitmq`
+      - Verify storage class: `kubectl get sc`
+      - Check volume mounting: `kubectl describe pod <pod-name> -n rabbitmq`
+
+   d. Networking Issues:
+      ```bash
+      # Test cluster DNS
+      kubectl run -it --rm --restart=Never busybox --image=busybox:1.28 -- nslookup rabbitmq.rabbitmq.svc.cluster.local
+      
+      # Test port connectivity
+      kubectl run -it --rm --restart=Never busybox --image=busybox:1.28 -- telnet rabbitmq.rabbitmq.svc.cluster.local 5672
+      ```
+
+   e. Common Fixes:
+      ```bash
+      # Restart a pod
+      kubectl delete pod <pod-name> -n rabbitmq
+      
+      # Restart entire deployment
+      kubectl rollout restart statefulset rabbitmq -n rabbitmq
+      
+      # Reset admin password
+      kubectl delete secret rabbitmq -n rabbitmq
+      helm upgrade rabbitmq bitnami/rabbitmq -n rabbitmq --values values.yaml
+      ```
 
 
 

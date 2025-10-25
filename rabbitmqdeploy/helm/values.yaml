@@ -1,0 +1,84 @@
+# RabbitMQ Helm Chart Values
+global:
+  imageRegistry: ""  # Use official Docker Hub
+
+## Authentication Configuration
+auth:
+  username: admin
+  password: secret123  # Change this in production
+  erlangCookie: "RABBITMQ-ERLANG-COOKIE"
+  # For production, use existing secrets:
+  # existingPasswordSecret: ""
+  # existingErlangSecret: ""
+
+## Clustering Configuration
+replicaCount: 3  # High availability setup
+clustering:
+  enabled: true
+  addressType: hostname
+  forceBoot: false
+
+## Persistence Configuration
+persistence:
+  enabled: true
+  storageClass: "standard"  # Adjust to your cluster's storage class
+  size: 8Gi
+  accessModes:
+    - ReadWriteOnce
+
+## Resource Configuration
+resources:
+  requests:
+    memory: "256Mi"
+    cpu: "250m"
+  limits:
+    memory: "512Mi"
+    cpu: "500m"
+
+## Service Configuration
+service:
+  type: ClusterIP
+  amqpPort: 5672
+  managerPort: 15672
+  # If using LoadBalancer:
+  # type: LoadBalancer
+  # loadBalancerIP: ""
+
+## Metrics and Monitoring
+metrics:
+  enabled: true  # Enable Prometheus metrics
+  serviceMonitor:
+    enabled: false  # Disabled until Prometheus Operator is installed
+
+## Plugins Configuration
+plugins: "rabbitmq_management,rabbitmq_prometheus,rabbitmq_peer_discovery_k8s"
+
+## Pod Security
+podSecurityContext:
+  enabled: true
+  fsGroup: 1001
+  runAsUser: 1001
+
+## High Availability Configuration
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: rabbitmq
+          topologyKey: kubernetes.io/hostname
+
+## Health Checks
+readinessProbe:
+  enabled: true
+  initialDelaySeconds: 120
+  periodSeconds: 30
+  failureThreshold: 6
+
+livenessProbe:
+  enabled: true
+  initialDelaySeconds: 120
+  periodSeconds: 30
+  failureThreshold: 6
