@@ -229,6 +229,81 @@ Deploy RabbitMQ using the Bitnami Helm chart:
    kubectl port-forward --namespace rabbitmq svc/rabbitmq 15672:15672
    ```
 
+  ## 4a. Kubernetes: RabbitMQ Cluster Operator
+
+  Deploy RabbitMQ using the official RabbitMQ Cluster Operator for advanced clustering and lifecycle management.
+
+  ### 1. Install the RabbitMQ Cluster Operator (Helm)
+  ```bash
+  # Add the RabbitMQ Helm repo
+  helm repo add rabbitmq https://charts.rabbitmq.com
+  helm repo update
+
+  # Create namespace for operator and clusters
+  kubectl create namespace rabbitmq-system
+
+  # Install the operator
+  helm install rabbitmq-cluster-operator rabbitmq/rabbitmq-cluster-operator \
+    --namespace rabbitmq-system
+  ```
+
+  ### 2. Deploy a RabbitMQ Cluster
+  Create a `rabbitmq-cluster.yaml` manifest:
+  ```yaml
+  apiVersion: rabbitmq.com/v1beta1
+  kind: RabbitmqCluster
+  metadata:
+    name: my-rabbitmq
+    namespace: rabbitmq
+  spec:
+    replicas: 3  # Number of nodes in the cluster
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "250m"
+      limits:
+        memory: "512Mi"
+        cpu: "500m"
+    persistence:
+      storageClassName: "standard"  # Adjust to your cluster
+      storage: "8Gi"
+    rabbitmq:
+      additionalConfig: |
+        management.load_definitions = /etc/rabbitmq/definitions.json
+    image: "rabbitmq:3.13-management"  # Use management image for UI
+    service:
+      type: ClusterIP
+    override:
+      service:
+        ports:
+          - name: amqp
+            port: 5672
+          - name: management
+            port: 15672
+  ```
+  Apply the manifest:
+  ```bash
+  kubectl create namespace rabbitmq
+  kubectl apply -f rabbitmq-cluster.yaml
+  ```
+
+  ### 3. Access Management UI
+  ```bash
+  # Port forward the management UI
+  kubectl port-forward --namespace rabbitmq svc/my-rabbitmq 15672:15672
+  ```
+
+  ### 4. Credentials
+  Get the default credentials:
+  ```bash
+  kubectl get secret my-rabbitmq-default-user -n rabbitmq -o jsonpath='{.data.username}' | base64 -d
+  kubectl get secret my-rabbitmq-default-user -n rabbitmq -o jsonpath='{.data.password}' | base64 -d
+  ```
+
+  ### 5. Notes & Best Practices
+  - The Cluster Operator automates scaling, upgrades, and recovery.
+  - Use custom resource fields to configure advanced clustering, TLS, and monitoring.
+  - Always change default credentials and enable TLS for production.
 ## 5. Terraform Deployment
 
 Create a Terraform configuration for deploying RabbitMQ on Kubernetes:
