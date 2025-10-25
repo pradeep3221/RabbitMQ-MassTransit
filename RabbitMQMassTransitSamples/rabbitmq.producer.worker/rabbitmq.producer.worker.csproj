@@ -4,12 +4,10 @@
     <TargetFramework>net9.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <UserSecretsId>dotnet-rabbitmq.producer.worker-31508acb-9ef1-48ac-a0d5-2901a4194cd6</UserSecretsId>
+    <UserSecretsId>dotnet-rabbitmq.producer.worker-63c66998-b1aa-4627-8f8b-bbd92ba32515</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="MassTransit" Version="8.5.5" />
-    <PackageReference Include="MassTransit.RabbitMQ" Version="8.5.5" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.10" />
   </ItemGroup>
 </Project>
