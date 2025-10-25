@@ -11,6 +11,17 @@ The RabbitMQ producer application is now successfully running and connected to R
   - Username: `admin`
   - Password: `admin123`
 
+
+Note: ADD both applicaton to same docker network rabbitmq-net
+```powershell
+docker network create rabbitmq-net
+docker network inspect rabbitmq-net
+  docker network connect rabbitmq-net rabbitmq-producer-api
+docker run -d --name rabbitmq-producer-api --network rabbitmq-net -p 5047:8080 rabbitmq-producer-api
+
+docker run --hostname=rabbitmq --env=RABBITMQ_DEFAULT_USER=admin --env=RABBITMQ_DEFAULT_PASS=admin123 --env=RABBITMQ_ERLANG_COOKIE=unique-cookie-value --env=PATH=/opt/rabbitmq/sbin:/opt/erlang/bin:/opt/openssl/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin --env=ERLANG_INSTALL_PATH_PREFIX=/opt/erlang --env=OPENSSL_INSTALL_PATH_PREFIX=/opt/openssl --env=RABBITMQ_DATA_DIR=/var/lib/rabbitmq --env=RABBITMQ_VERSION=3.13.7 --env=RABBITMQ_PGP_KEY_ID=0x0A9AF2115F4687BD29803A206B73A36E6026DFCA --env=RABBITMQ_HOME=/opt/rabbitmq --env=HOME=/var/lib/rabbitmq --env=LANG=C.UTF-8 --env=LANGUAGE=C.UTF-8 --env=LC_ALL=C.UTF-8 --volume=rabbitmq_data:/var/lib/rabbitmq --volume=/var/lib/rabbitmq --network=rabbitmq-net -p 15672:15672 -p 15692:15692 -p 5671:5671 -p 5672:5672 --restart=no --label='org.opencontainers.image.ref.name=ubuntu' --label='org.opencontainers.image.version=24.04' --runtime=runc -d rabbitmq:3.13-management
+```
+
 ### 📊 What Just Happened?
 
 We successfully published 3 test messages to RabbitMQ:

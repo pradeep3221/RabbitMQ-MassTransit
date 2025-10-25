@@ -111,9 +111,9 @@ docker run -d --name rabbitmq \
     -p 15692:15692 \         # Prometheus metrics port
     -v rabbitmq_data:/var/lib/rabbitmq \  # Persist data
     -e RABBITMQ_DEFAULT_USER=admin \      # Custom username
-    -e RABBITMQ_DEFAULT_PASS=secret123 \  # Custom password
+    -e RABBITMQ_DEFAULT_PASS=admin123 \  # Custom password
     -e RABBITMQ_ERLANG_COOKIE=unique-cookie-value \  # For clustering
-    --hostname rabbitmq-1 \   # Set hostname for clustering
+    --hostname rabbitmq \   # Set hostname for clustering
     --health-cmd "rabbitmq-diagnostics check_running" \  # Health check
     --health-interval=30s \
     --health-timeout=10s \
