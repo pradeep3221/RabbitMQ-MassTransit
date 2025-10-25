@@ -311,3 +311,54 @@ terraform destroy
    - Keep RabbitMQ and Erlang versions up to date
    - Schedule regular maintenance windows
    - Monitor system resources and scale as needed
+
+
+
+
+
+   GitHub Prompt:
+   ```
+        # Prompt for GitHub Copilot
+
+        Create a detailed step-by-step guide for installing and configuring **RabbitMQ** in multiple environments:
+
+        ## 1. Standalone Installation
+        - Include instructions for **Windows**, **Linux (Ubuntu)**, and **macOS**.
+        - Cover prerequisites: Erlang installation, RabbitMQ package source, and service setup.
+        - Include basic management setup: enabling the management plugin and accessing the RabbitMQ dashboard.
+
+        ## 2. Docker Setup
+        - Provide a `docker run` command for a single RabbitMQ instance with the management UI.
+        - Explain ports, default credentials, and volume mapping for data persistence.
+
+        ## 3. Docker Compose
+        - Create a `docker-compose.yml` file defining:
+        - RabbitMQ service with management plugin
+        - Persistent volumes
+        - Custom user/password environment variables
+        - Include instructions to start and stop the service.
+
+        ## 4. Kubernetes with Helm
+        - Use the **official Bitnami RabbitMQ Helm chart**.
+        - Provide commands to:
+        - Add the Bitnami repo
+        - Install RabbitMQ in a namespace
+        - Expose the management UI using `kubectl port-forward`
+        - Include values.yaml customization (username, password, storage class, replica count).
+
+        ## 5. Terraform Deployment
+        - Show how to deploy RabbitMQ on a Kubernetes cluster using Terraform.
+        - Include:
+        - Provider configuration (Helm + Kubernetes)
+        - Terraform HCL snippet to deploy the RabbitMQ Helm release
+        - Output section to display access credentials or URLs.
+
+        ## Additional Requirements
+        - Use code blocks for all shell commands, YAML, and HCL examples.
+        - Keep steps minimal, clear, and beginner-friendly.
+        - Add comments in code snippets explaining key configurations.
+        - Ensure all commands are up to date and compatible with RabbitMQ 3.13+ and Helm 3.
+
+        Goal: Produce a single markdown or documentation file that walks through RabbitMQ installation across all these environments.
+
+    ```
