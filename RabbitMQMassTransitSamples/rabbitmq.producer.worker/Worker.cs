@@ -6,7 +6,7 @@ namespace rabbitmq.producer.worker;
 public class Worker : BackgroundService
 {
     private readonly ILogger<Worker> _logger;
-    private readonly IPublishEndpoint _publishEndpoint;
+    private readonly IBus _bus;
     private readonly Random _random = new();
     private readonly string[] _products = new[] 
     { 
@@ -14,10 +14,10 @@ public class Worker : BackgroundService
         "Monitor", "Printer", "Camera", "Tablet", "Speaker" 
     };
 
-    public Worker(ILogger<Worker> logger, IPublishEndpoint publishEndpoint)
+    public Worker(ILogger<Worker> logger, IBus bus)
     {
         _logger = logger;
-        _publishEndpoint = publishEndpoint;
+        _bus = bus;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -32,7 +32,7 @@ public class Worker : BackgroundService
                     Quantity: _random.Next(1, 10)
                 );
 
-                await _publishEndpoint.Publish(message, stoppingToken);
+                await _bus.Publish(message, stoppingToken);
 
                 _logger.LogInformation("📦 Published order: {OrderId} for product: {ProductName} with quantity: {Quantity}",
                     message.OrderId, message.ProductName, message.Quantity);
