@@ -1,6 +1,8 @@
 using MassTransit;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using rabbitmq.producer.api.Contracts;
+using rabbitmq.producer.api.Persistence;
 
 namespace rabbitmq.producer.api.Controllers;
 
@@ -10,11 +12,19 @@ public class OrderController : ControllerBase
 {
     private readonly IPublishEndpoint _publishEndpoint;
     private readonly ILogger<OrderController> _logger;
+    private readonly OutboxDbContext _dbContext;
+    private readonly bool _useTransactionalOutbox;
 
-    public OrderController(IPublishEndpoint publishEndpoint, ILogger<OrderController> logger)
+    public OrderController(
+        IPublishEndpoint publishEndpoint, 
+        ILogger<OrderController> logger,
+        OutboxDbContext dbContext,
+        IConfiguration configuration)
     {
         _publishEndpoint = publishEndpoint;
         _logger = logger;
+        _dbContext = dbContext;
+        _useTransactionalOutbox = configuration.GetValue<bool>("UseTransactionalOutbox");
     }
 
     /// <summary>
@@ -40,12 +50,31 @@ public class OrderController : ControllerBase
 
         try
         {
-            // Publish the message to RabbitMQ
-            await _publishEndpoint.Publish(orderSubmitted);
+            if (_useTransactionalOutbox)
+            {
+                // Use EF transaction with outbox
+                using (var transaction = await _dbContext.Database.BeginTransactionAsync())
+                {
+                    // Publish the message through the outbox
+                    await _publishEndpoint.Publish(orderSubmitted);
 
-            _logger.LogInformation(
-                "Successfully published OrderSubmitted message - OrderId: {OrderId}",
-                orderId);
+                    // Commit the transaction - this will also store the message in the outbox
+                    await transaction.CommitAsync();
+                }
+
+                _logger.LogInformation(
+                    "Successfully published OrderSubmitted message using outbox - OrderId: {OrderId}",
+                    orderId);
+            }
+            else
+            {
+                // Direct in-memory publishing
+                await _publishEndpoint.Publish(orderSubmitted);
+
+                _logger.LogInformation(
+                    "Successfully published OrderSubmitted message in-memory - OrderId: {OrderId}",
+                    orderId);
+            }
 
             return Ok(new
             {
@@ -53,7 +82,7 @@ public class OrderController : ControllerBase
                 OrderId = orderId,
                 ProductName = request.ProductName,
                 Quantity = request.Quantity,
-                Status = "Published to RabbitMQ"
+                Status = _useTransactionalOutbox ? "Published to outbox" : "Published in-memory"
             });
         }
         catch (Exception ex)
@@ -71,7 +100,7 @@ public class OrderController : ControllerBase
     }
 
     /// <summary>
-    /// Publishes multiple test orders to RabbitMQ
+    /// Publishes multiple test orders to RabbitMQ using the transactional outbox
     /// </summary>
     /// <param name="count">Number of test orders to publish</param>
     /// <returns>Summary of published orders</returns>
@@ -88,48 +117,89 @@ public class OrderController : ControllerBase
 
         _logger.LogInformation("Starting batch publish of {Count} orders", count);
 
-        for (int i = 0; i < count; i++)
+        try
         {
-            var orderId = Guid.NewGuid();
-            var productName = products[i % products.Length];
-            var quantity = Random.Shared.Next(1, 10);
-
-            var orderSubmitted = new OrderSubmitted(orderId, productName, quantity);
-
-            try
+            if (_useTransactionalOutbox)
             {
-                await _publishEndpoint.Publish(orderSubmitted);
-
-                _logger.LogInformation(
-                    "Published order {Index}/{Total} - OrderId: {OrderId}, Product: {ProductName}, Quantity: {Quantity}",
-                    i + 1, count, orderId, productName, quantity);
-
-                publishedOrders.Add(new
+                // Start a single transaction for the entire batch
+                using (var transaction = await _dbContext.Database.BeginTransactionAsync())
                 {
-                    OrderId = orderId,
-                    ProductName = productName,
-                    Quantity = quantity
-                });
+                    for (int i = 0; i < count; i++)
+                    {
+                        var orderId = Guid.NewGuid();
+                        var productName = products[i % products.Length];
+                        var quantity = Random.Shared.Next(1, 10);
+
+                        var orderSubmitted = new OrderSubmitted(orderId, productName, quantity);
+
+                        // Publish the message through the outbox
+                        await _publishEndpoint.Publish(orderSubmitted);
+
+                        _logger.LogInformation(
+                            "Published order {Index}/{Total} to outbox - OrderId: {OrderId}, Product: {ProductName}, Quantity: {Quantity}",
+                            i + 1, count, orderId, productName, quantity);
+
+                        publishedOrders.Add(new
+                        {
+                            OrderId = orderId,
+                            ProductName = productName,
+                            Quantity = quantity
+                        });
+                    }
+
+                    // Commit the transaction - this will store all messages in the outbox
+                    await transaction.CommitAsync();
+                }
             }
-            catch (Exception ex)
+            else
             {
-                _logger.LogError(ex,
-                    "Failed to publish order {Index}/{Total} - OrderId: {OrderId}",
-                    i + 1, count, orderId);
+                // Direct in-memory publishing for each message
+                for (int i = 0; i < count; i++)
+                {
+                    var orderId = Guid.NewGuid();
+                    var productName = products[i % products.Length];
+                    var quantity = Random.Shared.Next(1, 10);
+
+                    var orderSubmitted = new OrderSubmitted(orderId, productName, quantity);
+
+                    // Direct publish without outbox
+                    await _publishEndpoint.Publish(orderSubmitted);
+
+                    _logger.LogInformation(
+                        "Published order {Index}/{Total} in-memory - OrderId: {OrderId}, Product: {ProductName}, Quantity: {Quantity}",
+                        i + 1, count, orderId, productName, quantity);
+
+                    publishedOrders.Add(new
+                    {
+                        OrderId = orderId,
+                        ProductName = productName,
+                        Quantity = quantity
+                    });
+                }
             }
+
+            _logger.LogInformation(
+                "Batch publish completed - {SuccessCount}/{TotalCount} orders published successfully",
+                publishedOrders.Count, count);
+
+            return Ok(new
+            {
+                Message = "Batch orders submitted",
+                TotalRequested = count,
+                SuccessfullyPublished = publishedOrders.Count,
+                Orders = publishedOrders,
+                Status = _useTransactionalOutbox ? "Published to outbox" : "Published in-memory"
+            });
         }
-
-        _logger.LogInformation(
-            "Batch publish completed - {SuccessCount}/{TotalCount} orders published successfully",
-            publishedOrders.Count, count);
-
-        return Ok(new
+        catch (Exception ex)
         {
-            Message = "Batch orders submitted",
-            TotalRequested = count,
-            SuccessfullyPublished = publishedOrders.Count,
-            Orders = publishedOrders
-        });
+            _logger.LogError(ex, "Failed to process batch orders");
+            return StatusCode(500, new
+            {
+                Message = "Failed to submit batch orders",
+                Error = ex.Message
+            });
+        }
     }
 }
 

@@ -17,7 +17,42 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - rabbitmq-net
+
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: sqlserver-masstransit
+    environment:
+      - ACCEPT_EULA=Y
+      - SA_PASSWORD=Admin@123
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqlserver_data:/var/opt/mssql
+    networks:
+      - rabbitmq-net
+
+  api:
+    build:
+      context: ./rabbitmq.producer.api
+      dockerfile: Dockerfile
+    container_name: rabbitmq-producer-api
+    ports:
+      - "5000:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:8080
+    depends_on:
+      - rabbitmq
+      - sqlserver
+    networks:
+      - rabbitmq-net
 
 volumes:
   rabbitmq_data:
+  sqlserver_data:
 
+networks:
+  rabbitmq-net:
+    driver: bridge

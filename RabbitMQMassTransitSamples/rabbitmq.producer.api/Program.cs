@@ -1,4 +1,6 @@
 using MassTransit;
+using Microsoft.EntityFrameworkCore;
+using rabbitmq.producer.api.Persistence;
 
 namespace rabbitmq.producer.api
 {
@@ -15,15 +17,34 @@ namespace rabbitmq.producer.api
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen();
 
-            // Configure MassTransit with RabbitMQ
+            // Configure SQL Server for the transactional outbox
+            builder.Services.AddDbContext<OutboxDbContext>(options =>
+                options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+            // Configure MassTransit with RabbitMQ and optional outbox
             var rabbitMqHost = builder.Configuration["RabbitMQ:Host"] ?? "localhost";
             var rabbitMqUsername = builder.Configuration["RabbitMQ:Username"] ?? "guest";
             var rabbitMqPassword = builder.Configuration["RabbitMQ:Password"] ?? "guest";
             var exchangeName = builder.Configuration["RabbitMQ:ExchangeName"] ?? "orders-exchange";
             var queueName = builder.Configuration["RabbitMQ:QueueName"] ?? "order-submitted-queue";
+            var useTransactionalOutbox = builder.Configuration.GetValue<bool>("UseTransactionalOutbox");
 
             builder.Services.AddMassTransit(x =>
             {
+                if (useTransactionalOutbox)
+                {
+                    // Configure the Entity Framework Core outbox when enabled
+                    x.AddEntityFrameworkOutbox<OutboxDbContext>(o =>
+                    {
+                        // Configure the outbox to use SQL Server
+                        o.UseSqlServer();
+
+                        // Configure the outbox options
+                        o.QueryDelay = TimeSpan.FromSeconds(1); // How often to query for outbox messages
+                        o.DuplicateDetectionWindow = TimeSpan.FromSeconds(30); // How long to store sent message IDs
+                    });
+                }
+
                 x.UsingRabbitMq((context, cfg) =>
                 {
                     cfg.Host(rabbitMqHost, "/", h =>
