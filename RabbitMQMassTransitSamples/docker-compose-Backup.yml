@@ -21,9 +21,7 @@ services:
       - rabbitmq-net
 
   sqlserver:
-    build:
-      context: .
-      dockerfile: Dockerfile.sqlserver
+    image: mcr.microsoft.com/mssql/server:2022-latest
     container_name: sqlserver-masstransit
     environment:
       - ACCEPT_EULA=Y
@@ -48,18 +46,6 @@ services:
     depends_on:
       - rabbitmq
       - sqlserver
-    networks:
-      - rabbitmq-net
-
-  worker:
-    build:
-      context: ./rabbitmq.consumer.worker
-      dockerfile: Dockerfile
-    container_name: rabbitmq-consumer-worker
-    environment:
-      - DOTNET_ENVIRONMENT=Development
-    depends_on:
-      - rabbitmq
     networks:
       - rabbitmq-net
 

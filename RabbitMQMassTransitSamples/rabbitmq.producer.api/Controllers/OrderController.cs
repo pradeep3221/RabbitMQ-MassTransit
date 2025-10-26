@@ -52,25 +52,40 @@ public class OrderController : ControllerBase
         {
             if (_useTransactionalOutbox)
             {
-                // Use EF transaction with outbox
-                using (var transaction = await _dbContext.Database.BeginTransactionAsync())
+                _logger.LogInformation("Publishing message using outbox - OrderId: {OrderId}", orderId);
+
+                // Use EF Core's retry strategy
+                var strategy = _dbContext.Database.CreateExecutionStrategy();
+                await strategy.ExecuteAsync(async () =>
                 {
-                    // Publish the message through the outbox
-                    await _publishEndpoint.Publish(orderSubmitted);
-
-                    // Commit the transaction - this will also store the message in the outbox
-                    await transaction.CommitAsync();
-                }
-
-                _logger.LogInformation(
-                    "Successfully published OrderSubmitted message using outbox - OrderId: {OrderId}",
-                    orderId);
+                    await using var transaction = await _dbContext.Database.BeginTransactionAsync();
+                    try
+                    {
+                        // The publish will be done through the outbox
+                        await _publishEndpoint.Publish(orderSubmitted);
+                        
+                        // Ensure changes are saved to trigger outbox
+                        await _dbContext.SaveChangesAsync();
+                        
+                        // Commit the transaction to finalize the outbox entries
+                        await transaction.CommitAsync();
+                        
+                        _logger.LogInformation(
+                            "Successfully published message to outbox - OrderId: {OrderId}", orderId);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error during transaction - rolling back - OrderId: {OrderId}", orderId);
+                        await transaction.RollbackAsync();
+                        throw;
+                    }
+                });
             }
             else
             {
                 // Direct in-memory publishing
+                _logger.LogInformation("Publishing message directly (no outbox) - OrderId: {OrderId}", orderId);
                 await _publishEndpoint.Publish(orderSubmitted);
-
                 _logger.LogInformation(
                     "Successfully published OrderSubmitted message in-memory - OrderId: {OrderId}",
                     orderId);
@@ -121,35 +136,50 @@ public class OrderController : ControllerBase
         {
             if (_useTransactionalOutbox)
             {
-                // Start a single transaction for the entire batch
-                using (var transaction = await _dbContext.Database.BeginTransactionAsync())
+                // Use EF Core's retry strategy for the batch
+                var strategy = _dbContext.Database.CreateExecutionStrategy();
+                await strategy.ExecuteAsync(async () =>
                 {
-                    for (int i = 0; i < count; i++)
+                    // Start a single transaction for the entire batch
+                    await using var transaction = await _dbContext.Database.BeginTransactionAsync();
+                    try 
                     {
-                        var orderId = Guid.NewGuid();
-                        var productName = products[i % products.Length];
-                        var quantity = Random.Shared.Next(1, 10);
-
-                        var orderSubmitted = new OrderSubmitted(orderId, productName, quantity);
-
-                        // Publish the message through the outbox
-                        await _publishEndpoint.Publish(orderSubmitted);
-
-                        _logger.LogInformation(
-                            "Published order {Index}/{Total} to outbox - OrderId: {OrderId}, Product: {ProductName}, Quantity: {Quantity}",
-                            i + 1, count, orderId, productName, quantity);
-
-                        publishedOrders.Add(new
+                        for (int i = 0; i < count; i++)
                         {
-                            OrderId = orderId,
-                            ProductName = productName,
-                            Quantity = quantity
-                        });
-                    }
+                            var orderId = Guid.NewGuid();
+                            var productName = products[i % products.Length];
+                            var quantity = Random.Shared.Next(1, 10);
 
-                    // Commit the transaction - this will store all messages in the outbox
-                    await transaction.CommitAsync();
-                }
+                            var orderSubmitted = new OrderSubmitted(orderId, productName, quantity);
+
+                            // Publish through the outbox
+                            await _publishEndpoint.Publish(orderSubmitted);
+
+                            _logger.LogInformation(
+                                "Published order {Index}/{Total} to outbox - OrderId: {OrderId}, Product: {ProductName}, Quantity: {Quantity}",
+                                i + 1, count, orderId, productName, quantity);
+
+                            publishedOrders.Add(new
+                            {
+                                OrderId = orderId,
+                                ProductName = productName,
+                                Quantity = quantity
+                            });
+                        }
+
+                        // Save changes to ensure outbox entries are created
+                        await _dbContext.SaveChangesAsync();
+                        
+                        // Commit the transaction to finalize the outbox entries
+                        await transaction.CommitAsync();
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error during batch transaction - rolling back");
+                        await transaction.RollbackAsync();
+                        throw;
+                    }
+                });
             }
             else
             {
@@ -207,4 +237,3 @@ public class OrderController : ControllerBase
 /// Request model for submitting an order
 /// </summary>
 public record SubmitOrderRequest(string ProductName, int Quantity);
-

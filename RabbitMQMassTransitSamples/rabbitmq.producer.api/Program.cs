@@ -17,11 +17,15 @@ namespace rabbitmq.producer.api
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen();
 
-            // Configure SQL Server for the transactional outbox
+            // Configure SQL Server for the transactional outbox with retry logic
             builder.Services.AddDbContext<OutboxDbContext>(options =>
-                options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+                options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"),
+                    sqlOptions => sqlOptions.EnableRetryOnFailure(
+                        maxRetryCount: 5,
+                        maxRetryDelay: TimeSpan.FromSeconds(30),
+                        errorNumbersToAdd: null)));
 
-            // Configure MassTransit with RabbitMQ and optional outbox
+ // Configure MassTransit with RabbitMQ and optional outbox
             var rabbitMqHost = builder.Configuration["RabbitMQ:Host"] ?? "localhost";
             var rabbitMqUsername = builder.Configuration["RabbitMQ:Username"] ?? "guest";
             var rabbitMqPassword = builder.Configuration["RabbitMQ:Password"] ?? "guest";
@@ -53,16 +57,16 @@ namespace rabbitmq.producer.api
                         h.Password(rabbitMqPassword);
                     });
 
-                    // Configure message topology to use specific exchange and queue
+                    // Configure message topology to use specific exchange
                     cfg.Message<rabbitmq.producer.api.Contracts.OrderSubmitted>(e =>
                     {
-                        e.SetEntityName(exchangeName); // Set the exchange name
+                        e.SetEntityName(exchangeName);
                     });
 
                     // Configure publish topology
                     cfg.Publish<rabbitmq.producer.api.Contracts.OrderSubmitted>(e =>
                     {
-                        e.ExchangeType = "topic"; // Use topic exchange for routing flexibility
+                        e.ExchangeType = "topic"; // Use topic exchange with default routing
                     });
 
                     cfg.ConfigureEndpoints(context);

@@ -8,8 +8,8 @@ The RabbitMQ producer application is now successfully running and connected to R
 
 - **Swagger UI**: http://localhost:5047/swagger
 - **RabbitMQ Management**: http://localhost:15672
-  - Username: `admin`
-  - Password: `admin123`
+  - Username: `guest`
+  - Password: `guest`
 
 
 Note: ADD both applicaton to same docker network rabbitmq-net

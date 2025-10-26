@@ -17,8 +17,8 @@ The producer and consumer have been configured to use:
 {
   "RabbitMQ": {
     "Host": "localhost",
-    "Username": "admin",
-    "Password": "admin123",
+    "Username": "guest",
+    "Password": "guest",
     "ExchangeName": "orders-exchange",
     "QueueName": "order-submitted-queue"
   }
@@ -31,8 +31,8 @@ The producer and consumer have been configured to use:
 {
   "RabbitMQ": {
     "Host": "localhost",
-    "Username": "admin",
-    "Password": "admin123",
+    "Username": "guest",
+    "Password": "guest",
     "ExchangeName": "orders-exchange",
     "QueueName": "order-submitted-queue"
   }
